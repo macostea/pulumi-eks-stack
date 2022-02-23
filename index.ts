@@ -35,9 +35,23 @@ const s3Access = new aws.iam.RolePolicyAttachment("s3-access", {
     policyArn: aws.iam.ManagedPolicies.AmazonS3FullAccess
 });
 
-const secretAccess = new aws.iam.RolePolicyAttachment("secret-access", {
+const secretAccessPolicy = new aws.iam.RolePolicy("secret-access-policy", {
     role: buildRole,
-    policyArn: aws.iam.ManagedPolicies.AmazonSSMReadOnlyAccess
+    policy: pulumi.interpolate`{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+        "Effect": "Allow",
+        "Action": [
+            "secretsmanager:GetSecretValue",
+            "secretsmanager:DescribeSecret",
+            "secretsmanager:ListSecretVersionIds",
+            "secretsmanager:ListSecrets"
+        ],
+        "Resource": "*"
+        }
+    ]
+    }`,
 });
 
 const buildProject = new aws.codebuild.Project("pulumi-eks-stack-build", {
