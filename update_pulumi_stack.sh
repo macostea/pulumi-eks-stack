@@ -5,5 +5,5 @@ npm install
 npm run build
 
 # Update the stack
-pulumi stack select acme/website-production
+pulumi stack select dev
 pulumi up --yes
