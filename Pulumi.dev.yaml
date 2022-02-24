@@ -1,2 +1,3 @@
 config:
   aws:region: eu-central-1
+  pulumi-eks-stack:github-connection-id: 57402477-cad6-4726-920c-fde0c9a418e5
