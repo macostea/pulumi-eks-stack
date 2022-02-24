@@ -1,8 +1,11 @@
+import * as path from "path";
 import * as eks from "@pulumi/eks";
+import * as aws from "@pulumi/aws";
 import * as k8s from "@pulumi/kubernetes";
-import * as pulumi from "@pulumi/pulumi";
-import { createEKSIAMRoles, EKSIAMRolesResult } from "./iam";
+import { createEKSIAMRoles, EKSIAMRolesResult, createClusterAutoscalerRole } from "./iam";
 import { createNodeGroups } from "./workers";
+import { createClusterAutoscaler } from "./clusterAutoscaler";
+
 
 function createCluster(clusterName: string, roles: EKSIAMRolesResult) {
     const cluster = new eks.Cluster(clusterName, {
@@ -22,6 +25,8 @@ function createCluster(clusterName: string, roles: EKSIAMRolesResult) {
             roles.perfNodegroup
         ],
         skipDefaultNodeGroup: true,
+        enabledClusterLogTypes: ["api", "audit", "authenticator", "controllerManager", "scheduler"],
+        createOidcProvider: true
     });
 
     new k8s.rbac.v1.ClusterRole("clusterAdminRole", {
@@ -53,10 +58,14 @@ function createCluster(clusterName: string, roles: EKSIAMRolesResult) {
     return cluster;
 }
 
-export function createEKSCluster(clusterName: string) {
+export function createEKSCluster(outDirPath: string, clusterName: string) {
     const roles = createEKSIAMRoles();
     const cluster = createCluster(clusterName, roles);
     const nodeGroups = createNodeGroups(cluster, roles);
+    const autoscalerRole = createClusterAutoscalerRole(cluster);
+    autoscalerRole.arn.apply(autoscalerRoleArn => {
+        createClusterAutoscaler(path.join(__dirname, "cluster-autoscaler-autodiscover.yaml"), outDirPath, autoscalerRoleArn, cluster);
+    });
 
     return cluster;
 };

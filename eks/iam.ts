@@ -1,4 +1,6 @@
 import * as aws from "@pulumi/aws";
+import * as pulumi from "@pulumi/pulumi";
+import * as eks from "@pulumi/eks"
 
 function createAdminRole() {
     // Create the EKS cluster admins role.
@@ -71,43 +73,63 @@ function createNodeGroupRoles() {
     };
 }
 
-function createClusterAutoscalerRole() {
-    const autoscalerServiceRole = new aws.iam.Role(`autoscaler-eksClusterAutoscaler`, {
-        assumeRolePolicy: aws.iam.assumeRolePolicyForPrincipal({"Service": "ec2.amazonaws.com"})
-    });
-
-    const clusterAutoscalerRolePolicy = new aws.iam.RolePolicy("clusterautoscaler-full-acess", {
-        role: autoscalerServiceRole,
-        policy: {
-            Version: "2012-10-17",
-            Statement: [
-                { Effect: "Allow", Action: ["autoscaling:*", "ec2:DescribeLaunchTemplateVersions"], Resource: "*", },
-            ],
-        },
-    })
-
-    return autoscalerServiceRole;
-}
-
 export interface EKSIAMRolesResult {
     admins: aws.iam.Role;
     devs: aws.iam.Role;
     stdNodegroup: aws.iam.Role;
     perfNodegroup: aws.iam.Role;
-    autoscaler: aws.iam.Role;
 }
 
 export function createEKSIAMRoles(): EKSIAMRolesResult {
     const adminRole = createAdminRole();
     const devRole = createDeveloperRole();
     const nodeRoles = createNodeGroupRoles();
-    const autoscalerRole = createClusterAutoscalerRole();
 
     return {
         admins: adminRole,
         devs: devRole,
         stdNodegroup: nodeRoles.stdNodegroupIamRole,
         perfNodegroup: nodeRoles.perfNodegroupIamRole,
-        autoscaler: autoscalerRole,
     };
 };
+
+
+export function createClusterAutoscalerRole(cluster: eks.Cluster) {
+    const clusterOidcProvider = cluster.core.oidcProvider!;
+
+    const clusterAutoscalerRolePolicy = pulumi.all([clusterOidcProvider.arn]).apply(([arn])=>
+        aws.iam.getPolicyDocument({
+            statements: [
+                {
+                    actions: ["sts:AssumeRoleWithWebIdentity"],
+                    effect: "Allow",
+                    principals: [{ identifiers: [arn], type: "Federated" }],
+                }
+            ],
+        })
+    );
+
+    const fullAccessPolicy = new aws.iam.Policy("autoscaler-full-access-policy", {
+        policy: {
+            Version: "2012-10-17",
+            Statement: [
+                {
+                    Effect: "Allow",
+                    Action: ["autoscaling:*", "ec2:DescribeLaunchTemplateVersions"],
+                    Resource: "*",
+                },
+            ],
+        },
+    });
+
+    const autoscalerServiceRole = new aws.iam.Role("autoscaler-eksClusterAutoscaler", {
+        assumeRolePolicy: clusterAutoscalerRolePolicy.json,
+    });
+
+    const clusterAutoscalerRolePolicyAttachment = new aws.iam.RolePolicyAttachment("autoscaler-full-access-attachment", {
+        policyArn: fullAccessPolicy.arn,
+        role: autoscalerServiceRole,
+    })
+
+    return autoscalerServiceRole;
+}
