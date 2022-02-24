@@ -37,21 +37,35 @@ function createDeveloperRole() {
 }
 
 // Attach policies to a role.
-function attachPoliciesToRole(name: string, role: aws.iam.Role, policyArns: string[]) {
+function attachPoliciesToRole(name: string, role: aws.iam.Role, policyArns: Map<string, pulumi.Input<aws.ARN>>) {
     for (const policyArn of policyArns) {
-        new aws.iam.RolePolicyAttachment(`${name}-${policyArn.split('/')[1]}`,
-            { policyArn: policyArn, role: role },
+        new aws.iam.RolePolicyAttachment(`${name}-${policyArn[0]}`,
+            { policyArn: policyArn[1], role: role },
         );
     }
 }
 
 function createNodeGroupRoles() {
+    // Create fluentd policy.
+    const fluentdCloudWatchPolicy = new aws.iam.Policy("fluentd-cloudwatch-policy",
+        {
+            description: "Allows fluentd-cloudwatch to work with CloudWatch Logs.",
+            policy: JSON.stringify(
+                {
+                    Version: "2012-10-17",
+                    Statement: [{Effect: "Allow", Action: ["logs:*"], Resource: ["arn:aws:logs:*:*:*"]}]
+                }
+            )
+        },
+    );
+
     // The managed policies EKS requires of nodegroups join a cluster.
-    const nodegroupManagedPolicyArns: string[] = [
-        "arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy",
-        "arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy",
-        "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly",
-    ];
+    const nodegroupManagedPolicyArns = new Map<string, pulumi.Input<aws.ARN>>([
+        ["AmazonEKSWorkerNodePolicy", "arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy"],
+        ["AmazonEKS_CNI_Policy", "arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy"],
+        ["AmazonEC2ContainerRegistryReadOnly", "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly"],
+        ["fluentd-cloudwatch-policy", fluentdCloudWatchPolicy.arn],
+    ]);
 
     // Create the standard node group worker role and attach the required policies.
     const stdName = "standardNodeGroup";
@@ -59,6 +73,7 @@ function createNodeGroupRoles() {
         assumeRolePolicy: aws.iam.assumeRolePolicyForPrincipal({"Service": "ec2.amazonaws.com"})
     });
     attachPoliciesToRole(stdName, stdNodegroupIamRole, nodegroupManagedPolicyArns);
+    
 
     // Create the performant node group worker role and attach the required policies.
     const perfName = "performanceNodeGroup";

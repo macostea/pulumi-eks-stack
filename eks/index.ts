@@ -5,6 +5,7 @@ import * as k8s from "@pulumi/kubernetes";
 import { createEKSIAMRoles, EKSIAMRolesResult, createClusterAutoscalerRole } from "./iam";
 import { createNodeGroups } from "./workers";
 import { createClusterAutoscaler } from "./clusterAutoscaler";
+import { createFluentd } from "./fluentd";
 
 
 function createCluster(clusterName: string, roles: EKSIAMRolesResult) {
@@ -62,6 +63,7 @@ export function createEKSCluster(outDirPath: string, clusterName: string) {
     const roles = createEKSIAMRoles();
     const cluster = createCluster(clusterName, roles);
     const nodeGroups = createNodeGroups(cluster, roles);
+    const fluentdCloudwatch = createFluentd(clusterName, cluster);
     const autoscalerRole = createClusterAutoscalerRole(cluster);
     autoscalerRole.arn.apply(autoscalerRoleArn => {
         createClusterAutoscaler(path.join(__dirname, "cluster-autoscaler-autodiscover.yaml"), outDirPath, autoscalerRoleArn, cluster);
