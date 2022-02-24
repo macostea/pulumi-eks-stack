@@ -2,6 +2,9 @@ import * as aws from "@pulumi/aws";
 import * as pulumi from "@pulumi/pulumi";
 import * as eks from "@pulumi/eks"
 
+import * as fs from "fs";
+import * as path from "path";
+
 function createAdminRole() {
     // Create the EKS cluster admins role.
     const adminsName = "admins";
@@ -88,23 +91,45 @@ function createNodeGroupRoles() {
     };
 }
 
+function createAlbIngressRole() {
+    // Create IAM Policy for the IngressController.
+    const albPolicyFile = fs.readFileSync(path.join(__dirname, "alb-iam_policy.json"), "utf8");
+    const ingressControllerPolicy = new aws.iam.Policy("AWSLoadBalancerControllerIAMPolicy", {
+        policy: albPolicyFile
+    });
+
+    const albIngressControllerRole = new aws.iam.Role("aws-load-balancer-controller", {
+        assumeRolePolicy: aws.iam.assumeRolePolicyForPrincipal({"Service": "ec2.amazonaws.com"}),
+    });
+
+    new aws.iam.RolePolicyAttachment("albIngressControllerPolicyAttachment", {
+        policyArn: ingressControllerPolicy.arn,
+        role: albIngressControllerRole,
+    });
+
+    return albIngressControllerRole;
+}
+
 export interface EKSIAMRolesResult {
     admins: aws.iam.Role;
     devs: aws.iam.Role;
     stdNodegroup: aws.iam.Role;
     perfNodegroup: aws.iam.Role;
+    albIngressControllerRole: aws.iam.Role;
 }
 
 export function createEKSIAMRoles(): EKSIAMRolesResult {
     const adminRole = createAdminRole();
     const devRole = createDeveloperRole();
     const nodeRoles = createNodeGroupRoles();
+    const albIngressControllerRole = createAlbIngressRole();
 
     return {
         admins: adminRole,
         devs: devRole,
         stdNodegroup: nodeRoles.stdNodegroupIamRole,
         perfNodegroup: nodeRoles.perfNodegroupIamRole,
+        albIngressControllerRole: albIngressControllerRole,
     };
 };
 
