@@ -91,45 +91,23 @@ function createNodeGroupRoles() {
     };
 }
 
-function createAlbIngressRole() {
-    // Create IAM Policy for the IngressController.
-    const albPolicyFile = fs.readFileSync(path.join(__dirname, "alb-iam_policy.json"), "utf8");
-    const ingressControllerPolicy = new aws.iam.Policy("AWSLoadBalancerControllerIAMPolicy", {
-        policy: albPolicyFile
-    });
-
-    const albIngressControllerRole = new aws.iam.Role("aws-load-balancer-controller", {
-        assumeRolePolicy: aws.iam.assumeRolePolicyForPrincipal({"Service": "ec2.amazonaws.com"}),
-    });
-
-    new aws.iam.RolePolicyAttachment("albIngressControllerPolicyAttachment", {
-        policyArn: ingressControllerPolicy.arn,
-        role: albIngressControllerRole,
-    });
-
-    return albIngressControllerRole;
-}
-
 export interface EKSIAMRolesResult {
     admins: aws.iam.Role;
     devs: aws.iam.Role;
     stdNodegroup: aws.iam.Role;
     perfNodegroup: aws.iam.Role;
-    albIngressControllerRole: aws.iam.Role;
 }
 
 export function createEKSIAMRoles(): EKSIAMRolesResult {
     const adminRole = createAdminRole();
     const devRole = createDeveloperRole();
     const nodeRoles = createNodeGroupRoles();
-    const albIngressControllerRole = createAlbIngressRole();
 
     return {
         admins: adminRole,
         devs: devRole,
         stdNodegroup: nodeRoles.stdNodegroupIamRole,
         perfNodegroup: nodeRoles.perfNodegroupIamRole,
-        albIngressControllerRole: albIngressControllerRole,
     };
 };
 
@@ -172,4 +150,36 @@ export function createClusterAutoscalerRole(cluster: eks.Cluster) {
     })
 
     return autoscalerServiceRole;
+}
+
+export function createAlbIngressRole(cluster: eks.Cluster) {
+    const clusterOidcProvider = cluster.core.oidcProvider!;
+    // Create IAM Policy for the IngressController.
+    const albRolePolicy = pulumi.all([clusterOidcProvider.arn]).apply(([arn])=>
+        aws.iam.getPolicyDocument({
+            statements: [
+                {
+                    actions: ["sts:AssumeRoleWithWebIdentity"],
+                    effect: "Allow",
+                    principals: [{ identifiers: [arn], type: "Federated" }],
+                }
+            ],
+        })
+    );
+
+    const albPolicyFile = fs.readFileSync(path.join(__dirname, "alb-iam_policy.json"), "utf8");
+    const ingressControllerPolicy = new aws.iam.Policy("AWSLoadBalancerControllerIAMPolicy", {
+        policy: albPolicyFile
+    });
+
+    const albIngressControllerRole = new aws.iam.Role("aws-load-balancer-controller-role", {
+        assumeRolePolicy: albRolePolicy.json,
+    });
+
+    new aws.iam.RolePolicyAttachment("albIngressControllerPolicyAttachment", {
+        policyArn: ingressControllerPolicy.arn,
+        role: albIngressControllerRole,
+    });
+
+    return albIngressControllerRole;
 }
