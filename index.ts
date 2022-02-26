@@ -15,7 +15,8 @@ if (fs.existsSync(outDirPath)) {
 fs.mkdirSync(outDirPath);
 
 const codePipeline = createCodePipeline(githubConnectionId);
-const eksCluster = createEKSCluster(outDirPath, "pulumi-eks-cluster");
+const eksClusterResult = createEKSCluster(outDirPath, "pulumi-eks-cluster");
 
 export const pipeline = codePipeline.name;
-export const kubeconfig = eksCluster.kubeconfig;
+export const kubeconfig = eksClusterResult.cluster.kubeconfig;
+export const restApiServiceAccount = eksClusterResult.restApiServiceAccount.metadata.name;

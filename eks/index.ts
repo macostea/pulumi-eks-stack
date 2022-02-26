@@ -1,8 +1,7 @@
 import * as path from "path";
 import * as eks from "@pulumi/eks";
-import * as aws from "@pulumi/aws";
 import * as k8s from "@pulumi/kubernetes";
-import { createEKSIAMRoles, EKSIAMRolesResult, createClusterAutoscalerRole, createAlbIngressRole } from "./iam";
+import { createEKSIAMRoles, EKSIAMRolesResult, createClusterAutoscalerRole, createAlbIngressRole, createRestAPIRoleAndServiceAccount } from "./iam";
 import { createNodeGroups } from "./workers";
 import { createClusterAutoscaler } from "./clusterAutoscaler";
 import { createFluentBit } from "./fluent-bit";
@@ -72,5 +71,10 @@ export function createEKSCluster(outDirPath: string, clusterName: string) {
         createClusterAutoscaler(path.join(__dirname, "cluster-autoscaler-autodiscover.yaml"), outDirPath, autoscalerRoleArn, cluster);
     });
 
-    return cluster;
+    const restApiServiceAccount = createRestAPIRoleAndServiceAccount(cluster);
+
+    return {
+        cluster,
+        restApiServiceAccount,
+    }
 };

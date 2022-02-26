@@ -1,6 +1,7 @@
 import * as aws from "@pulumi/aws";
 import * as pulumi from "@pulumi/pulumi";
-import * as eks from "@pulumi/eks"
+import * as eks from "@pulumi/eks";
+import * as k8s from "@pulumi/kubernetes";
 
 import * as fs from "fs";
 import * as path from "path";
@@ -66,7 +67,7 @@ function createNodeGroupRoles() {
     const nodegroupManagedPolicyArns = new Map<string, pulumi.Input<aws.ARN>>([
         ["AmazonEKSWorkerNodePolicy", "arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy"],
         ["AmazonEKS_CNI_Policy", "arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy"],
-        ["AmazonEC2ContainerRegistryReadOnly", "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly"],
+        ["AmazonEC2ContainerRegistryReadOnly", aws.iam.ManagedPolicies.AmazonEC2ContainerRegistryReadOnly],
         ["fluentd-cloudwatch-policy", fluentdCloudWatchPolicy.arn],
     ]);
 
@@ -182,4 +183,43 @@ export function createAlbIngressRole(cluster: eks.Cluster) {
     });
 
     return albIngressControllerRole;
+}
+
+export function createRestAPIRoleAndServiceAccount(cluster: eks.Cluster) {
+    const clusterOidcProvider = cluster.core.oidcProvider!;
+
+    const restAPIPolicy = pulumi.all([clusterOidcProvider.arn]).apply(([arn])=>
+        aws.iam.getPolicyDocument({
+            statements: [
+                {
+                    actions: ["sts:AssumeRoleWithWebIdentity"],
+                    effect: "Allow",
+                    principals: [{ identifiers: [arn], type: "Federated" }],
+                }
+            ],
+        })
+    );
+
+    const restApiRole = new aws.iam.Role("restApiRole", {
+        assumeRolePolicy: restAPIPolicy.json,
+    });
+
+    new aws.iam.RolePolicyAttachment("restApiRolePolicyAttachment", {
+        policyArn: aws.iam.ManagedPolicies.AmazonDynamoDBFullAccess,
+        role: restApiRole,
+    });
+
+    const sa = new k8s.core.v1.ServiceAccount("restApiServiceAccount", {
+        metadata: {
+            namespace: "default",
+            name: "rest-api-service-account",
+            annotations: {
+                "eks.amazonaws.com/role-arn": restApiRole.arn,
+            }
+        }
+    }, {
+        provider: cluster.provider
+    });
+
+    return sa;
 }
