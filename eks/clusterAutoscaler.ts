@@ -17,7 +17,7 @@ function updateAutoscalerYAML(yamlFilePath: string, outDirPath: string, clusterN
 }
 
 function deployAutoscaler(autoscalerYAMLFilePath: string, cluster: eks.Cluster) {
-    const autoscalerYAMLFile = new k8s.yaml.ConfigFile("autoscaler", {
+    new k8s.yaml.ConfigFile("autoscaler", {
             file: autoscalerYAMLFilePath,
         },
         { provider: cluster.provider }
@@ -29,4 +29,4 @@ export function createClusterAutoscaler(yamlFilePath: string, outDirPath: string
         const autoscalerYAMLFilePath = updateAutoscalerYAML(yamlFilePath, outDirPath, clusterName, autoscalerRoleArn);
         deployAutoscaler(autoscalerYAMLFilePath, cluster);
     });
-};
+}

@@ -13,7 +13,7 @@ function createAdminRole() {
         assumeRolePolicy: aws.getCallerIdentity().then(id =>
             aws.iam.assumeRolePolicyForPrincipal({"AWS": `arn:aws:iam::${id.accountId}:root`}))
     })
-    const adminsIamRolePolicy = new aws.iam.RolePolicy(`${adminsName}-eksClusterAdminPolicy`, {
+    new aws.iam.RolePolicy(`${adminsName}-eksClusterAdminPolicy`, {
         role: adminsIamRole,
         policy: {
             Version: "2012-10-17",
@@ -110,11 +110,15 @@ export function createEKSIAMRoles(): EKSIAMRolesResult {
         stdNodegroup: nodeRoles.stdNodegroupIamRole,
         perfNodegroup: nodeRoles.perfNodegroupIamRole,
     };
-};
+}
 
 
 export function createClusterAutoscalerRole(cluster: eks.Cluster) {
-    const clusterOidcProvider = cluster.core.oidcProvider!;
+    if (!cluster.core.oidcProvider) {
+        throw new Error("cluster.core.oidcProvider is undefined");
+    }
+
+    const clusterOidcProvider = cluster.core.oidcProvider;
 
     const clusterAutoscalerRolePolicy = pulumi.all([clusterOidcProvider.arn]).apply(([arn])=>
         aws.iam.getPolicyDocument({
@@ -145,7 +149,7 @@ export function createClusterAutoscalerRole(cluster: eks.Cluster) {
         assumeRolePolicy: clusterAutoscalerRolePolicy.json,
     });
 
-    const clusterAutoscalerRolePolicyAttachment = new aws.iam.RolePolicyAttachment("autoscaler-full-access-attachment", {
+    new aws.iam.RolePolicyAttachment("autoscaler-full-access-attachment", {
         policyArn: fullAccessPolicy.arn,
         role: autoscalerServiceRole,
     })
@@ -154,7 +158,11 @@ export function createClusterAutoscalerRole(cluster: eks.Cluster) {
 }
 
 export function createAlbIngressRole(cluster: eks.Cluster) {
-    const clusterOidcProvider = cluster.core.oidcProvider!;
+    if (!cluster.core.oidcProvider) {
+        throw new Error("cluster.core.oidcProvider is undefined");
+    }
+
+    const clusterOidcProvider = cluster.core.oidcProvider;
     // Create IAM Policy for the IngressController.
     const albRolePolicy = pulumi.all([clusterOidcProvider.arn]).apply(([arn])=>
         aws.iam.getPolicyDocument({
@@ -186,7 +194,11 @@ export function createAlbIngressRole(cluster: eks.Cluster) {
 }
 
 export function createRestAPIRoleAndServiceAccount(cluster: eks.Cluster) {
-    const clusterOidcProvider = cluster.core.oidcProvider!;
+    if (!cluster.core.oidcProvider) {
+        throw new Error("cluster.core.oidcProvider is undefined");
+    }
+
+    const clusterOidcProvider = cluster.core.oidcProvider;
 
     const restAPIPolicy = pulumi.all([clusterOidcProvider.arn]).apply(([arn])=>
         aws.iam.getPolicyDocument({

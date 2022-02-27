@@ -62,10 +62,10 @@ function createCluster(clusterName: string, roles: EKSIAMRolesResult) {
 export function createEKSCluster(outDirPath: string, clusterName: string) {
     const roles = createEKSIAMRoles();
     const cluster = createCluster(clusterName, roles);
-    const nodeGroups = createNodeGroups(cluster, roles);
-    const fluentdCloudwatch = createFluentBit(clusterName, cluster);
+    createNodeGroups(cluster, roles);
+    createFluentBit(clusterName, cluster);
     const albIngressRole = createAlbIngressRole(cluster);
-    const albIngressController = createAlbIngressController(clusterName, cluster, albIngressRole);
+    createAlbIngressController(clusterName, cluster, albIngressRole);
     const autoscalerRole = createClusterAutoscalerRole(cluster);
     autoscalerRole.arn.apply(autoscalerRoleArn => {
         createClusterAutoscaler(path.join(__dirname, "cluster-autoscaler-autodiscover.yaml"), outDirPath, autoscalerRoleArn, cluster);
@@ -77,4 +77,4 @@ export function createEKSCluster(outDirPath: string, clusterName: string) {
         cluster,
         restApiServiceAccount,
     }
-};
+}

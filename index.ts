@@ -1,11 +1,11 @@
 import * as fs from "fs";
 import * as pulumi from "@pulumi/pulumi";
-import { createCodePipeline } from "./codepipeline/codepipeline";
-import { createEKSCluster } from "./eks/"
+// import { createCodePipeline } from "./codepipeline/codepipeline";
+import { createEKSCluster } from "./eks/";
 
 
 const config = new pulumi.Config();
-const githubConnectionId = config.require("github-connection-id");
+
 const outDirPath = config.require("out-dir");
 
 if (fs.existsSync(outDirPath)) {
@@ -14,9 +14,11 @@ if (fs.existsSync(outDirPath)) {
 
 fs.mkdirSync(outDirPath);
 
-const codePipeline = createCodePipeline(githubConnectionId);
+// Disable codepipeline for now as it does not work as expected.
+// const githubConnectionId = config.require("github-connection-id");
+// const codePipeline = createCodePipeline(githubConnectionId);
 const eksClusterResult = createEKSCluster(outDirPath, "pulumi-eks-cluster");
 
-export const pipeline = codePipeline.name;
+// export const pipeline = codePipeline.name;
 export const kubeconfig = eksClusterResult.cluster.kubeconfig;
 export const restApiServiceAccount = eksClusterResult.restApiServiceAccount.metadata.name;

@@ -1,5 +1,4 @@
 import * as pulumi from "@pulumi/pulumi";
-import * as aws from "@pulumi/aws";
 import * as eks from "@pulumi/eks";
 import { EKSIAMRolesResult } from "./iam";
 
