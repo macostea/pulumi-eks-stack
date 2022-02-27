@@ -6,7 +6,7 @@ import * as k8s from "@pulumi/kubernetes";
 function updateAutoscalerYAML(yamlFilePath: string, outDirPath: string, clusterName: string, autoscalerRoleArn: string) {
     const data = fs.readFileSync(yamlFilePath, 'utf8');
 
-    // This patching method has potential but at the moment the yaml file has been modified manually as well
+    // TODO: This patching method has potential but at the moment the yaml file has been modified manually as well
     let result = data.replace(/<YOUR CLUSTER NAME>/g, clusterName);
     result = result.replace(/<CLUSTER AUTOSCALER ROLE>/g, autoscalerRoleArn);
     const autoscalerYAMLFilePath = path.join(outDirPath, "cluster-autoscaler-autodiscovery.yaml");
