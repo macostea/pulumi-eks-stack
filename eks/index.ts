@@ -4,7 +4,7 @@ import * as k8s from "@pulumi/kubernetes";
 import { createEKSIAMRoles, EKSIAMRolesResult, createClusterAutoscalerRole, createAlbIngressRole, createRestAPIRoleAndServiceAccount } from "./iam";
 import { createNodeGroups } from "./workers";
 import { createClusterAutoscaler } from "./clusterAutoscaler";
-import { createFluentBit } from "./fluent-bit";
+import { createFluentBit } from "./fluentBit";
 import { createAlbIngressController } from "./albIngressController";
 
 
